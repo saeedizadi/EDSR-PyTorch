@@ -24,10 +24,17 @@ def get_patch(*args, patch_size=96, scale=2, multi=False, input_large=False):
     else:
         tx, ty = ix, iy
 
-    ret = [
-        args[0][iy:iy + ip, ix:ix + ip, :],
-        *[a[ty:ty + tp, tx:tx + tp, :] for a in args[1:]]
-    ]
+    if len(args[0].shape) == 2:
+        ret = [
+            args[0][iy:iy + ip, ix:ix + ip],
+            *[a[ty:ty + tp, tx:tx + tp] for a in args[1:]]
+        ]
+    else:
+        ret = [
+            args[0][iy:iy + ip, ix:ix + ip, :],
+            *[a[ty:ty + tp, tx:tx + tp, :] for a in args[1:]]
+        ]
+
 
     return ret
 
@@ -62,9 +69,14 @@ def augment(*args, hflip=True, rot=True):
     rot90 = rot and random.random() < 0.5
 
     def _augment(img):
-        if hflip: img = img[:, ::-1, :]
-        if vflip: img = img[::-1, :, :]
-        if rot90: img = img.transpose(1, 0, 2)
+        if len(args[0].shape) == 2:
+            if hflip: img = img[:, ::-1]
+            if vflip: img = img[::-1, :]
+            if rot90: img = img.transpose(1, 0)
+        else:
+            if hflip: img = img[:, ::-1, :]
+            if vflip: img = img[::-1, :, :]
+            if rot90: img = img.transpose(1, 0, 2)
         
         return img
 

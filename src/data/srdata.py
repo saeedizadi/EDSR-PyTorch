@@ -16,7 +16,7 @@ class SRData(data.Dataset):
         self.name = name
         self.train = train
         self.split = 'train' if train else 'test'
-        self.do_eval = True
+        self.do_eval = False
         self.benchmark = benchmark
         self.input_large = (args.model == 'VDSR')
         self.scale = args.scale
