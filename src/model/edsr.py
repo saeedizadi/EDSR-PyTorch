@@ -26,9 +26,8 @@ class EDSR(nn.Module):
         scale = args.scale[0]
         act = nn.ReLU(True)
         # self.url = url['r{}f{}x{}'.format(n_resblocks, n_feats, scale)]
-        mean = [0.44]
-        self.sub_mean = common.MeanShift(mean)
-        self.add_mean = common.MeanShift(mean, sign=1)
+        self.sub_mean = common.MeanShift(args.n_colors, args.rgb_range)
+        self.add_mean = common.MeanShift(args.n_colors, args.rgb_range, sign=1)
 
         # define head module
         m_head = [conv(args.n_colors, n_feats, kernel_size)]

@@ -21,72 +21,71 @@ class BCA(nn.Module):
         super(BCA, self).__init__()
         self.in_ch = in_ch
 
-        self.reduction = nn.Sequential(nn.Conv2d(self.in_ch, reduction, kernel_size=1, padding=0, stride=1, bias=True),
-                                       nn.ReLU(inplace=True))
+        # self.reduction = nn.Sequential(nn.Conv2d(self.in_ch, reduction, kernel_size=1, padding=0, stride=1, bias=True),
+        #                                nn.ReLU(inplace=True))
         self.rowwise_conv = nn.Sequential(
-            nn.Conv2d(in_channels=reduction, out_channels=reduction * 4, kernel_size=(1, reduction), stride=1,
-                      padding=0, groups=reduction),
+            nn.Conv2d(in_channels=in_ch, out_channels=in_ch * 4, kernel_size=(1, in_ch), stride=1,
+                      padding=0, groups=in_ch),
             nn.LeakyReLU(0.1))
 
-        self.expand = nn.Sequential(nn.Conv2d(reduction * 4, self.in_ch, kernel_size=1, padding=0, stride=1, bias=True),
+        self.expand = nn.Sequential(nn.Conv2d(in_ch* 4, self.in_ch, kernel_size=1, padding=0, stride=1, bias=True),
                                     nn.Sigmoid())
 
     def forward(self, x):
         batch_size = x.size(0)
 
-        x_org = x.clone()
-        x = self.reduction(x)  # Bx64xHxW
+        x_org = x.clone()  # Bx64xHxW
+        # x = self.reduction(x)  # Bx16xHxW
 
-        x1 = x.view(batch_size, x.size()[1], -1)
-        x2 = x1.clone()
-        x2 = x2.permute(0, 2, 1)
+        x1 = x.view(batch_size, x.size()[1], -1)  # Bx64xHW
+        x2 = x1.clone()  # Bx64xHW
+        x2 = x2.permute(0, 2, 1)  # BxHWx64
 
-        corr = torch.matmul(x1, x2).unsqueeze(1)
-        corr = corr.permute(0, 3, 1, 2)
+        corr = torch.matmul(x1, x2).unsqueeze(1)   # Bx1x64x64
+        corr = corr.permute(0, 3, 1, 2)  # Bx64x1x64
 
-        res = self.rowwise_conv(corr)
-        res = self.expand(res)
+        res = self.rowwise_conv(corr)   # Bx256x1x1
+        res = self.expand(res)  # Bx64x1x1
 
         return res * x_org
 
 
 class BSA(nn.Module):
-    def __init__(self, in_ch=64, reduction=16):
+    def __init__(self, in_ch=64, blocksize=16):
         super(BSA, self).__init__()
         self.in_ch = in_ch
 
-        self.reduction = nn.Sequential(nn.Conv2d(self.in_ch, reduction, kernel_size=1, padding=0, stride=1, bias=True),
-                                       nn.ReLU(inplace=True))
+        # self.reduction = nn.Sequential(nn.Conv2d(self.in_ch, reduction, kernel_size=1, padding=0, stride=1, bias=True),
+        #                                nn.ReLU(inplace=True))
 
         self.downsample = nn.AvgPool2d(kernel_size=6)
         self.rowwise_conv = nn.Sequential(
-            nn.Conv2d(in_channels=64, out_channels=reduction * 4, kernel_size=(1, 64), stride=1,
-                      padding=0, groups=reduction),
+            nn.Conv2d(in_channels=blocksize**2, out_channels=blocksize**2 * 4, kernel_size=(1, blocksize**2), stride=1,
+                      padding=0, groups=blocksize**2),
             nn.LeakyReLU(0.1))
 
-        self.expand = nn.Sequential(nn.Conv2d(1, self.in_ch, kernel_size=1, padding=0, stride=1, bias=True),
+        self.expand = nn.Sequential(nn.Conv2d(blocksize**2 * 4, blocksize**2, kernel_size=1, padding=0, stride=1, bias=True),
                                     nn.Sigmoid())
 
     def forward(self, x):
         batch_size = x.size(0)
 
-        x_org = x.clone()
-        x = self.reduction(x)  # Bx16xHxW
-        x = self.downsample(x)
+        x_org = x.clone()   #Bx64xHxW
+        # x = self.reduction(x)  # Bx16xHxW
+        x = F.adaptive_avg_pool2d(x, (16, 16))  # Bx64x16x16
+        # x = self.downsample(x)  # Bx16xH/4xW/4
 
-        x1 = x.view(batch_size, x.size()[1], -1)
-        x2 = x1.clone()
-        x1 = x1.permute(0, 2, 1)
+        x1 = x.view(batch_size, x.size()[1], -1)  # Bx64x256(HW)
+        x2 = x1.clone()  # Bx64x256(HW)
+        x1 = x1.permute(0, 2, 1)  # Bx256(HW)x64
 
-        corr = torch.matmul(x1, x2).unsqueeze(1)
-        corr = corr.permute(0, 3, 1, 2)
+        corr = torch.matmul(x1, x2).unsqueeze(1)  # Bx1x256x256
+        corr = corr.permute(0, 3, 1, 2)  # Bx256x1x256
 
-        res = self.rowwise_conv(corr)
-        res = res.view(batch_size, 1, x.size(2), x.size(3))
+        res = self.rowwise_conv(corr)  # Bx1024x1x1
+        res = self.expand(res)  # Bx256x1x1
+        res = res.view(batch_size, 1, x.size(2), x.size(3))  # Bx1x16x16
         res = nn.functional.interpolate(res, size=x_org.size()[2:], mode='nearest')
-
-        res = self.expand(res)
-
         return res * x_org
 
 
@@ -194,9 +193,8 @@ class BARN(nn.Module):
         kernel_size = 3
         scale = args.scale[0]
         act = nn.ReLU(True)
-        mean = [0.44]
-        self.sub_mean = common.MeanShift(mean)
-        self.add_mean = common.MeanShift(mean, sign=1)
+        self.sub_mean = common.MeanShift(args.n_colors, args.rgb_range)
+        self.add_mean = common.MeanShift(args.n_colors, args.rgb_range, sign=1)
 
         # define head module
         m_head = [conv(args.n_colors, n_feats, kernel_size)]

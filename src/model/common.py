@@ -78,15 +78,17 @@ class NonLocal(nn.Module):
 
 
 class MeanShift(nn.Conv2d):
-    def __init__(self, mean, sign=-1):
-        if len(mean) == 3:
+    def __init__(self, n_colors, rgb_range, sign=-1):
+        if n_colors == 3:
+            mean = (0.4488, 0.4371, 0.4040)
             super(MeanShift, self).__init__(3, 3, kernel_size=1)
             self.weight.data = torch.eye(3).view(3, 3, 1, 1)
-            self.bias.data = sign * torch.Tensor(mean)
+            self.bias.data = sign * rgb_range * torch.Tensor(mean)
         else:
+            mean = [0.44]
             super(MeanShift, self).__init__(1, 1, kernel_size=1)
             self.weight.data = torch.eye(1).view(1, 1, 1, 1)
-            self.bias.data = sign * torch.tensor(mean)
+            self.bias.data = sign * rgb_range * torch.tensor(mean)
 
         for p in self.parameters():
             p.requires_grad = False
@@ -94,15 +96,15 @@ class MeanShift(nn.Conv2d):
 
 # class MeanShift(nn.Conv2d):
 #     def __init__(
-#         self, rgb_range,
-#         rgb_mean=(0.4488, 0.4371, 0.4040), rgb_std=(1.0, 1.0, 1.0), sign=-1):
-#
+#             self, rgb_range,
+#             rgb_mean=(0.4488, 0.4371, 0.4040), rgb_std=(1.0, 1.0, 1.0), sign=-1):
 #         super(MeanShift, self).__init__(3, 3, kernel_size=1)
 #         std = torch.Tensor(rgb_std)
 #         self.weight.data = torch.eye(3).view(3, 3, 1, 1) / std.view(3, 1, 1, 1)
 #         self.bias.data = sign * rgb_range * torch.Tensor(rgb_mean) / std
 #         for p in self.parameters():
 #             p.requires_grad = False
+
 
 class BasicBlock(nn.Sequential):
     def __init__(
