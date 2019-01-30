@@ -37,7 +37,7 @@ parser.add_argument('--patch_size', type=int, default=192,
                     help='output patch size')
 parser.add_argument('--rgb_range', type=int, default=255,
                     help='maximum value of RGB')
-parser.add_argument('--n_colors', type=int, default=3,
+parser.add_argument('--n_colors', type=int, default=1,
                     help='number of color channels to use')
 parser.add_argument('--chop', action='store_true',
                     help='enable memory-efficient forward')
@@ -85,6 +85,8 @@ parser.add_argument('--reduction', type=int, default=16,
 # Option for BARN
 parser.add_argument('--downsample', type=str, default='avg',
                     help='Type of downsampling in the NLocal Block')
+parser.add_argument('--n_seconds', type=int, default=4,
+                    help='Number of second order pooling blocks')
 parser.add_argument('--ex_ratios', nargs='+', type=int, help='list of extent ratios for the NLB')
 
 # Training specifications
@@ -108,7 +110,7 @@ parser.add_argument('--gan_k', type=int, default=1,
 # Optimization specifications
 parser.add_argument('--lr', type=float, default=1e-4,
                     help='learning rate')
-parser.add_argument('--decay', type=str, default='200',
+parser.add_argument('--decay', type=str, default='90-120-140',
                     help='learning rate decay type')
 parser.add_argument('--gamma', type=float, default=0.5,
                     help='learning rate decay factor for step decay')
@@ -163,4 +165,3 @@ for arg in vars(args):
         vars(args)[arg] = True
     elif vars(args)[arg] == 'False':
         vars(args)[arg] = False
-
