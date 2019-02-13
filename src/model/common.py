@@ -11,6 +11,62 @@ def default_conv(in_channels, out_channels, kernel_size, bias=True):
         padding=(kernel_size // 2), bias=bias)
 
 
+class SecondOrderDownsample(nn.Module):
+    def __init__(self, in_features, reduction, down_factor):
+        super(SecondOrderDownsample, self).__init__()
+        self.reduction = reduction
+        self.down_factor = down_factor
+        self.in_features = in_features
+        # self.norm = nn.InstanceNorm1d(in_features, affine=False)
+        if self.reduction <= self.in_features:
+            self.reduce = nn.Conv2d(in_features, reduction, kernel_size=1, padding=0, stride=1)
+            self.rowwise_conv = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=(1, reduction), stride=1,
+                                          padding=0)
+            self.expansion = nn.Conv2d(reduction, in_features, kernel_size=1, padding=0, stride=1)
+        else:
+            self.rowwise_conv = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=(1, in_features), stride=1,
+                                          padding=0)
+
+    def chunk(self, x, downsample):
+        batchsize = x.size(0)
+        channels = x.size(1)
+        res = [torch.split(c, downsample, dim=3) for c in list(torch.split(x, downsample, dim=2))]
+        covs = []
+        for i in range(len(res)):
+            for j in range(len(res[0])):
+                block = res[i][j].contiguous().view(batchsize, channels, -1)  # NxCxHW
+                # block = self.norm(block)
+                # onev = torch.ones((batchsize, N, 1)).to(torch.device('cuda'))
+                # I = torch.eye(N).to(torch.device('cuda')) - (1 / N) * torch.matmul(
+                #     onev, torch.transpose(onev, 1, 2))
+                # temp = torch.matmul(block, I)
+                # covs.append(torch.matmul(temp, block.permute(0, 2, 1)).unsqueeze(1))  # Nx1xCxC
+                cc = torch.matmul(block, block.permute(0, 2, 1)).unsqueeze(1)
+                covs.append(cc)  # Nx1xCxC
+        covs = torch.cat(covs, dim=1)  # NxM^2xCxC
+        return covs
+
+    def forward(self, x):
+        batchsize = x.size(0)
+        M = 1 if self.down_factor == 1 else x.size(3) // self.down_factor
+        if self.reduction < self.in_features:
+            x = self.reduce(x)
+        x = self.chunk(x, x.size(2)) if self.down_factor == 1 else self.chunk(x, self.down_factor)  # NxM^2xCxC
+        if batchsize == 1:
+            print(x.size())
+        MM = x.size(1)  # M^2
+
+        x = x.view(batchsize * MM, 1, x.size(2), x.size(3))  # (NxM^2)x1xCxC
+        x = self.rowwise_conv(x)
+        x = x.view(batchsize, MM, x.size(2))  # NxM^2xC
+
+        x = x.permute(0, 2, 1)  # NxCxM^2
+        x = x.view(batchsize, self.reduction, M, M)  # NxCxMxM
+        if self.reduction < self.in_features:
+            x = self.expansion(x)
+        return x
+
+
 class NonLocal(nn.Module):
     def __init__(self, in_channels, extent=None, downsample='conv'):
         super(NonLocal, self).__init__()

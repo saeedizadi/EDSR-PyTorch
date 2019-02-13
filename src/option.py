@@ -85,9 +85,19 @@ parser.add_argument('--reduction', type=int, default=16,
 # Option for BARN
 parser.add_argument('--downsample', type=str, default='avg',
                     help='Type of downsampling in the NLocal Block')
+parser.add_argument('--aggregate', type=str, default='cat',
+                    help='type of position-wise and channel-wise aggregation')
+
 parser.add_argument('--n_seconds', type=int, default=4,
                     help='Number of second order pooling blocks')
-parser.add_argument('--ex_ratios', nargs='+', type=int, help='list of extent ratios for the NLB')
+
+parser.add_argument('--bsize', type=int, default=16,
+                    help='donwsample size for position-wise GSOP')
+
+parser.add_argument('--down_factor', nargs='+', type=int, help='list of extent ratios for the NLB')
+
+parser.add_argument('--att_batchnorm', action='store_true',
+                    help='Use batchnorm in attention module')
 
 # Training specifications
 parser.add_argument('--reset', action='store_true',

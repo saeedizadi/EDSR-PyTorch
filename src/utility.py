@@ -179,15 +179,17 @@ def calc_psnr(sr, hr, scale, rgb_range, dataset=None):
 
     if dataset and dataset.dataset.benchmark:
         shave = scale
-        if diff.size(1) > 1:
-            gray_coeffs = [65.738, 129.057, 25.064]
-            convert = diff.new_tensor(gray_coeffs).view(1, 3, 1, 1) / 256
-            diff = diff.mul(convert).sum(dim=1)
+        # if diff.size(1) > 1:
+        #     # gray_coeffs = [65.738, 129.057, 25.064]
+        #     gray_coeffs = [65.738, 129.057, 25.064]
+        #     convert = diff.new_tensor(gray_coeffs).view(1, 3, 1, 1) / 256
+        #     diff = diff.mul(convert).sum(dim=1)
     else:
         shave = scale + 6
 
-    valid = diff[..., shave:-shave, shave:-shave]
-    mse = valid.pow(2).mean()
+    # valid = diff[..., shave:-shave, shave:-shave]
+    # mse = valid.pow(2).mean()
+    mse = diff.pow(2).mean()
 
     return -10 * math.log10(mse)
 
@@ -297,6 +299,6 @@ def calc_ssim(img1, img2):
 
     img1 = img1.squeeze().cpu().data.numpy()
     img2 = img2.squeeze().cpu().data.numpy()
-    return ssim(img1, img2, data_range=img1.max() - img1.min())
+    return ssim(img1, img2, data_range=img1.max() - img1.min(), multichannel=True)
 
     # return _ssim(img1, img2, window, window_size, channel, size_average)
