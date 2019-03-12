@@ -18,6 +18,9 @@ import torch
 import torch.optim as optim
 import torch.optim.lr_scheduler as lrs
 from math import exp
+import numpy
+import scipy.signal
+import scipy.ndimage
 
 
 class timer():
@@ -179,17 +182,16 @@ def calc_psnr(sr, hr, scale, rgb_range, dataset=None):
 
     if dataset and dataset.dataset.benchmark:
         shave = scale
-        # if diff.size(1) > 1:
-        #     # gray_coeffs = [65.738, 129.057, 25.064]
-        #     gray_coeffs = [65.738, 129.057, 25.064]
-        #     convert = diff.new_tensor(gray_coeffs).view(1, 3, 1, 1) / 256
-        #     diff = diff.mul(convert).sum(dim=1)
+        if diff.size(1) > 1:
+            # gray_coeffs = [65.738, 129.057, 25.064]
+            gray_coeffs = [65.738, 129.057, 25.064]
+            convert = diff.new_tensor(gray_coeffs).view(1, 3, 1, 1) / 256
+            diff = diff.mul(convert).sum(dim=1)
     else:
         shave = scale + 6
 
-    # valid = diff[..., shave:-shave, shave:-shave]
-    # mse = valid.pow(2).mean()
-    mse = diff.pow(2).mean()
+    valid = diff[..., shave:-shave, shave:-shave]
+    mse = valid.pow(2).mean()
 
     return -10 * math.log10(mse)
 
@@ -285,6 +287,57 @@ def _ssim(img1, img2, window, window_size, channel, size_average=True):
         return ssim_map.mean(1).mean(1).mean(1)
 
 
+def vifp_mscale(ref, dist):
+    sigma_nsq = 2
+    eps = 1e-10
+
+    num = 0.0
+    den = 0.0
+    for scale in range(1, 5):
+
+        N = 2 ** (4 - scale + 1) + 1
+        sd = N / 5.0
+
+        if (scale > 1):
+            ref = scipy.ndimage.gaussian_filter(ref, sd)
+            dist = scipy.ndimage.gaussian_filter(dist, sd)
+            ref = ref[::2, ::2]
+            dist = dist[::2, ::2]
+
+        mu1 = scipy.ndimage.gaussian_filter(ref, sd)
+        mu2 = scipy.ndimage.gaussian_filter(dist, sd)
+        mu1_sq = mu1 * mu1
+        mu2_sq = mu2 * mu2
+        mu1_mu2 = mu1 * mu2
+        sigma1_sq = scipy.ndimage.gaussian_filter(ref * ref, sd) - mu1_sq
+        sigma2_sq = scipy.ndimage.gaussian_filter(dist * dist, sd) - mu2_sq
+        sigma12 = scipy.ndimage.gaussian_filter(ref * dist, sd) - mu1_mu2
+
+        sigma1_sq[sigma1_sq < 0] = 0
+        sigma2_sq[sigma2_sq < 0] = 0
+
+        g = sigma12 / (sigma1_sq + eps)
+        sv_sq = sigma2_sq - g * sigma12
+
+        g[sigma1_sq < eps] = 0
+        sv_sq[sigma1_sq < eps] = sigma2_sq[sigma1_sq < eps]
+        sigma1_sq[sigma1_sq < eps] = 0
+
+        g[sigma2_sq < eps] = 0
+        sv_sq[sigma2_sq < eps] = 0
+
+        sv_sq[g < 0] = sigma2_sq[g < 0]
+        g[g < 0] = 0
+        sv_sq[sv_sq <= eps] = eps
+
+        num += numpy.sum(numpy.log10(1 + g * g * sigma1_sq / (sv_sq + sigma_nsq)))
+        den += numpy.sum(numpy.log10(1 + sigma1_sq / sigma_nsq))
+
+    vifp = num / den
+
+    return vifp
+
+
 # def calc_ssim(img1, img2, window_size=15, size_average=True):
 #     (_, channel, _, _) = img1.size()
 #     window = create_window(window_size, channel)
@@ -296,9 +349,21 @@ def _ssim(img1, img2, window, window_size, channel, size_average=True):
 #     return _ssim(img1, img2, window, window_size, channel, size_average)
 
 def calc_ssim(img1, img2):
-
     img1 = img1.squeeze().cpu().data.numpy()
     img2 = img2.squeeze().cpu().data.numpy()
     return ssim(img1, img2, data_range=img1.max() - img1.min(), multichannel=True)
 
+
+def calc_ifc(img1, img2):
+    img1 = rgb2ycbcr(np.transpose(img1.squeeze().cpu().data.numpy(), (1,2,0)))[:,:,0]
+    img2 = rgb2ycbcr(np.transpose(img2.squeeze().cpu().data.numpy(), (1,2,0)))[:,:,0]
+    print(img1.shape)
+    return vifp_mscale(img2, img1)
+
     # return _ssim(img1, img2, window, window_size, channel, size_average)
+
+def rgb2ycbcr(im):
+    xform = np.array([[.299, .587, .114], [-.1687, -.3313, .5], [.5, -.4187, -.0813]])
+    ycbcr = im.dot(xform.T)
+    ycbcr[:,:,[1,2]] += 128
+    return np.uint8(ycbcr)

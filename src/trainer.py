@@ -74,7 +74,7 @@ class Trainer():
         epoch = self.optimizer.get_last_epoch() + 1
         self.ckp.write_log('\nEvaluation:')
         self.ckp.add_log(
-            torch.zeros(1, len(self.loader_test), len(self.scale))
+            torch.zeros(2, len(self.loader_test), len(self.scale))
         )
         self.model.eval()
 
@@ -89,25 +89,35 @@ class Trainer():
                     sr = utility.quantize(sr, self.args.rgb_range)
 
                     save_list = [sr]
-                    self.ckp.log[-1, idx_data, idx_scale] += utility.calc_psnr(
+                    self.ckp.log[0, idx_data, idx_scale] += utility.calc_psnr(
                         sr, hr, scale, self.args.rgb_range, dataset=d)
 
-                    # self.ckp.log[-1, idx_data, idx_scale] += utility.calc_ssim(
-                    #     sr, hr
-                    # )
+                    self.ckp.log[1, idx_data, idx_scale] += utility.calc_ssim(
+                        sr, hr
+                    )
                     if self.args.save_gt:
                         save_list.extend([lr, hr])
 
                     if self.args.save_results:
                         self.ckp.save_results(d, filename[0], save_list, scale)
 
-                self.ckp.log[-1, idx_data, idx_scale] /= len(d)
+                self.ckp.log[0, idx_data, idx_scale] /= len(d)
+                self.ckp.log[1, idx_data, idx_scale] /= len(d)
                 best = self.ckp.log.max(0)
                 self.ckp.write_log(
                     '[{} x{}]\tPSNR: {:.4f} (Best: {:.3f} @epoch {})'.format(
                         d.dataset.name,
                         scale,
-                        self.ckp.log[-1, idx_data, idx_scale],
+                        self.ckp.log[0, idx_data, idx_scale],
+                        best[0][idx_data, idx_scale],
+                        best[1][idx_data, idx_scale] + 1
+                    )
+                )
+                self.ckp.write_log(
+                    '[{} x{}]\tSSIM: {:.4f} (Best: {:.3f} @epoch {})'.format(
+                        d.dataset.name,
+                        scale,
+                        self.ckp.log[1, idx_data, idx_scale],
                         best[0][idx_data, idx_scale],
                         best[1][idx_data, idx_scale] + 1
                     )

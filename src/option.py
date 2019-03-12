@@ -19,13 +19,13 @@ parser.add_argument('--seed', type=int, default=1,
                     help='random seed')
 
 # Data specifications
-parser.add_argument('--dir_data', type=str, default='../../data/data3',
+parser.add_argument('--dir_data', type=str, default='../../data',
                     help='dataset directory')
 parser.add_argument('--dir_demo', type=str, default='../test',
                     help='demo image directory')
-parser.add_argument('--data_train', type=str, default='CLE',
+parser.add_argument('--data_train', type=str, default='DIV2K',
                     help='train dataset name')
-parser.add_argument('--data_test', type=str, default='CLE',
+parser.add_argument('--data_test', type=str, default='DIV2K',
                     help='test dataset name')
 parser.add_argument('--data_range', type=str, default='1-800/801-810',
                     help='train/test data range')
@@ -37,7 +37,7 @@ parser.add_argument('--patch_size', type=int, default=192,
                     help='output patch size')
 parser.add_argument('--rgb_range', type=int, default=255,
                     help='maximum value of RGB')
-parser.add_argument('--n_colors', type=int, default=1,
+parser.add_argument('--n_colors', type=int, default=3,
                     help='number of color channels to use')
 parser.add_argument('--chop', action='store_true',
                     help='enable memory-efficient forward')
@@ -82,29 +82,12 @@ parser.add_argument('--n_resgroups', type=int, default=10,
 parser.add_argument('--reduction', type=int, default=16,
                     help='number of feature maps reduction')
 
-# Option for BARN
-parser.add_argument('--downsample', type=str, default='avg',
-                    help='Type of downsampling in the NLocal Block')
-parser.add_argument('--aggregate', type=str, default='cat',
-                    help='type of position-wise and channel-wise aggregation')
-
-parser.add_argument('--n_seconds', type=int, default=4,
-                    help='Number of second order pooling blocks')
-
-parser.add_argument('--bsize', type=int, default=16,
-                    help='donwsample size for position-wise GSOP')
-
-parser.add_argument('--down_factor', nargs='+', type=int, help='list of extent ratios for the NLB')
-
-parser.add_argument('--att_batchnorm', action='store_true',
-                    help='Use batchnorm in attention module')
-
 # Training specifications
 parser.add_argument('--reset', action='store_true',
                     help='reset the training')
 parser.add_argument('--test_every', type=int, default=1000,
                     help='do test per every N batches')
-parser.add_argument('--epochs', type=int, default=100,
+parser.add_argument('--epochs', type=int, default=300,
                     help='number of epochs to train')
 parser.add_argument('--batch_size', type=int, default=16,
                     help='input batch size for training')
@@ -120,7 +103,7 @@ parser.add_argument('--gan_k', type=int, default=1,
 # Optimization specifications
 parser.add_argument('--lr', type=float, default=1e-4,
                     help='learning rate')
-parser.add_argument('--decay', type=str, default='90-120-140',
+parser.add_argument('--decay', type=str, default='200',
                     help='learning rate decay type')
 parser.add_argument('--gamma', type=float, default=0.5,
                     help='learning rate decay factor for step decay')
@@ -128,7 +111,7 @@ parser.add_argument('--optimizer', default='ADAM',
                     choices=('SGD', 'ADAM', 'RMSprop'),
                     help='optimizer to use (SGD | ADAM | RMSprop)')
 parser.add_argument('--momentum', type=float, default=0.9,
-                    help='S:GD momentum')
+                    help='SGD momentum')
 parser.add_argument('--betas', type=tuple, default=(0.9, 0.999),
                     help='ADAM beta')
 parser.add_argument('--epsilon', type=float, default=1e-8,
@@ -161,15 +144,12 @@ parser.add_argument('--save_gt', action='store_true',
                     help='save low-resolution and high-resolution images together')
 
 args = parser.parse_args()
-template.set_template(args)
-
 args.scale = list(map(lambda x: int(x), args.scale.split('+')))
+template.set_template(args)
 args.data_train = args.data_train.split('+')
 args.data_test = args.data_test.split('+')
-
 if args.epochs == 0:
     args.epochs = 1e8
-
 for arg in vars(args):
     if vars(args)[arg] == 'True':
         vars(args)[arg] = True

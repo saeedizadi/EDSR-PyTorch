@@ -1,5 +1,7 @@
 from model import common
-
+import torch
+import torchvision.transforms as transforms
+import PIL
 import torch.nn as nn
 import torch.nn.init as init
 
@@ -7,8 +9,10 @@ url = {
     'r20f64': ''
 }
 
+
 def make_model(args, parent=False):
     return VDSR(args)
+
 
 class VDSR(nn.Module):
     def __init__(self, args, conv=common.default_conv):
@@ -16,10 +20,10 @@ class VDSR(nn.Module):
 
         n_resblocks = args.n_resblocks
         n_feats = args.n_feats
-        kernel_size = 3 
+        kernel_size = 3
         self.url = url['r{}f{}'.format(n_resblocks, n_feats)]
-        self.sub_mean = common.MeanShift(args.rgb_range)
-        self.add_mean = common.MeanShift(args.rgb_range, sign=1)
+        # self.sub_mean = common.MeanShift(args.n_colors, args.rgb_range)
+        # self.add_mean = common.MeanShift(args.n_colors, args.rgb_range, sign=1)
 
         def basic_block(in_channels, out_channels, act):
             return common.BasicBlock(
@@ -37,10 +41,12 @@ class VDSR(nn.Module):
         self.body = nn.Sequential(*m_body)
 
     def forward(self, x):
-        x = self.sub_mean(x)
+
+        # x = self.sub_mean(x)
         res = self.body(x)
         res += x
-        x = self.add_mean(res)
+        # x = self.add_mean(res)
 
-        return x 
+        return res
+
 

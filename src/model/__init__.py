@@ -13,7 +13,7 @@ class Model(nn.Module):
 
         self.scale = args.scale
         self.idx_scale = 0
-        self.input_large = (args.model == 'VDSR')
+        self.input_large = (args.model in ['VDSR', 'SRCNN', 'MEMNET', 'DRCN', 'DRRN'])
         self.self_ensemble = args.self_ensemble
         self.chop = args.chop
         self.precision = args.precision
@@ -100,7 +100,7 @@ class Model(nn.Module):
             )
 
         if load_from:
-            self.model.load_state_dict(load_from, strict=True)
+            self.model.load_state_dict(load_from, strict=False)
 
     def forward_chop(self, *args, shave=10, min_size=160000):
         scale = 1 if self.input_large else self.scale[self.idx_scale]
